@@ -20,6 +20,11 @@ rule all:
     input:
         f"{outdir}/search-genomes.sig.zip",
         f"{outdir}/search-genomes-x-brmetagenomes.manysearch.csv",
+        # f"{outdir}/search-genomes-x-brmetagenomes.manysearch.checked.csv",
+        f"{outdir}/bins-x-search-genomes.multisearch.csv",
+        f"{outdir}/bins-x-search-genomes.multisearch.sc1000.csv",
+        f"{outdir}/bins-x-search-genomes.multisearch.sc10.csv",
+
 
 
 rule write_directsketch_csv:
@@ -45,7 +50,7 @@ rule sourmash_sketch_search_genomes:
         sourmash scripts gbsketch -p dna,k=21,k=31,k=51,scaled=1000 {input.csv} -o {output.sig}
         """
 
-rule sourmash_manysearch:
+rule sourmash_manysearch_metagenomes:
     """
     search genomes against a set of metagenomes using sourmash manysearch
     """
@@ -62,3 +67,108 @@ rule sourmash_manysearch:
         sourmash scripts manysearch {input.genomes_zip} {input.metagenomes_mf} -k 31 --scaled 1000 --output {output.csv} > {log} 2>&1
         """
 
+rule write_manysketch_bins_csv:
+    input:
+        bins="multi_bins.txt",
+    output:
+        csv=f"{outdir}/bins.manysketch.csv"
+    run:
+        with open(output.csv, 'w') as f:
+            f.write("name,genome_filename,protein_filename\n")
+            # iterate over input fasta files and write to csv
+            bin_list = [i.strip() for i in open(input.bins).readlines()]
+            for bin_file in bin_list:
+                sample_bin = os.path.basename(bin_file).replace("MEGAHIT-MetaBAT2-", "").replace(".fa", "")
+                f.write(f"{sample_bin},{bin_file},\n")
+
+rule manysketch_bins:
+    input:
+        csv=f"{outdir}/bins.manysketch.csv"
+    output:
+        sig=f"{outdir}/bins.sig.zip"
+    threads: 4
+    benchmark: f"{outdir}/logs/sketch-bins.benchmark"
+    shell:
+        """
+        sourmash scripts manysketch -p dna,k=21,k=31,k=51,scaled=100 {input.csv} -o {output.sig}
+        """
+
+rule manysketch_bins_sc10:
+    input:
+        csv=f"{outdir}/bins.manysketch.csv"
+    output:
+        sig=f"{outdir}/bins.sc10.sig.zip"
+    threads: 4
+    benchmark: f"{outdir}/logs/sketch-bins.benchmark"
+    shell:
+        """
+        sourmash scripts manysketch -p dna,k=21,k=31,k=51,scaled=10 {input.csv} -o {output.sig}
+        """
+
+# better - just do the orig sketching as higher res.
+rule sourmash_sketch_search_genomes_highres:
+    input:
+        csv=f"{outdir}/search-genomes.gbsketch.csv",
+    output:
+        sig=f"{outdir}/search-genomes.sc10.sig.zip",
+    threads: 4
+    benchmark: f"{outdir}/logs/sketch-search-genomes.sc10.benchmark"
+    shell:
+        """
+        sourmash scripts gbsketch -p dna,k=21,k=31,k=51,scaled=10 {input.csv} -o {output.sig}
+        """
+
+# now search bins against the search genomes
+rule multisearch_bins_sc100:
+    """
+    search bins against the search genomes using sourmash manysearch
+    """
+    input:
+        genomes_zip=f"{outdir}/search-genomes.sc10.sig.zip",
+        bins_sig=f"{outdir}/bins.sig.zip",
+    output:
+        csv=f"{outdir}/bins-x-search-genomes.multisearch.csv"
+    threads: 4
+    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.log"
+    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.benchmark"
+    shell:
+        """
+        sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 100 --output {output.csv} --ani -m DNA --threshold 0.001 > {log} 2>&1
+        """
+
+rule multisearch_bins_sc10:
+    """
+    search bins against the search genomes using sourmash manysearch
+    """
+    input:
+        genomes_zip=f"{outdir}/search-genomes.sc10.sig.zip",
+        bins_sig=f"{outdir}/bins.sc10.sig.zip",
+    output:
+        csv=f"{outdir}/bins-x-search-genomes.multisearch.sc10.csv"
+    threads: 4
+    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.log"
+    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.benchmark"
+    shell:
+        """
+        sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 10 --output {output.csv} --ani -m DNA --threshold 0.001 > {log} 2>&1
+        """
+
+# do we really need the highres? try at sc1000
+rule multisearch_bins_sc1000:
+    """
+    search bins against the search genomes using sourmash manysearch
+    """
+    input:
+        genomes_zip=f"{outdir}/search-genomes.sig.zip",
+        bins_sig=f"{outdir}/bins.sig.zip",
+    output:
+        csv=f"{outdir}/bins-x-search-genomes.multisearch.sc1000.csv"
+    threads: 4
+    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc1000.log"
+    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc1000.benchmark"
+    shell:
+        """
+        sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 1000 --output {output.csv} --ani -m DNA > {log} 2>&1
+        """
+
+# now aggregate and assess the results
