@@ -1,0 +1,6 @@
+.snakemake/
+20241212_CAT_nr.tar.gz
+20241212_CAT_nr_website/
+output.*
+testbins*
+*zip
