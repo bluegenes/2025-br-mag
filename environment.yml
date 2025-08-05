@@ -1,0 +1,12 @@
+name: 2025-br-mag
+channels:
+    - conda-forge
+    - bioconda
+    - defaults
+dependencies:
+    - sourmash>=4.9.3,<5
+    - sourmash_plugin_branchwater>=0.9.13,<1 # actually, need 0.9.14
+    - sourmash_plugin_directsketch>=0.6.3,<1
+    - snakemake-minimal>=9,<10
+    - pandas
+
