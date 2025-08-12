@@ -24,6 +24,7 @@ rule all:
         f"{outdir}/bins-x-search-genomes.multisearch.csv",
         f"{outdir}/bins-x-search-genomes.multisearch.sc1000.csv",
         f"{outdir}/bins-x-search-genomes.multisearch.sc10.csv",
+        f"{outdir}/bins-x-ncbi-entire.manysearch.csv",
 
 
 
@@ -129,8 +130,8 @@ rule multisearch_bins_sc100:
     output:
         csv=f"{outdir}/bins-x-search-genomes.multisearch.csv"
     threads: 4
-    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.log"
-    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.benchmark"
+    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc100.log"
+    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc100.benchmark"
     shell:
         """
         sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 100 --output {output.csv} --ani -m DNA --threshold 0.001 > {log} 2>&1
@@ -146,11 +147,11 @@ rule multisearch_bins_sc10:
     output:
         csv=f"{outdir}/bins-x-search-genomes.multisearch.sc10.csv"
     threads: 4
-    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.log"
-    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.benchmark"
+    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc10.log"
+    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc10.benchmark"
     shell:
         """
-        sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 10 --output {output.csv} --ani -m DNA --threshold 0.001 > {log} 2>&1
+        sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 10 --output {output.csv} --ani -m DNA --threshold 0.01 > {log} 2>&1
         """
 
 # do we really need the highres? try at sc1000
@@ -169,6 +170,20 @@ rule multisearch_bins_sc1000:
     shell:
         """
         sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 1000 --output {output.csv} --ani -m DNA > {log} 2>&1
+        """
+
+
+rule sourmash_manysearch_ncbi_entire:
+    input:
+        zip=f"{outdir}/bins.sig.zip",
+        db= "/group/ctbrowngrp5/sourmash-db/entire-2025-01-21/entire-2025-01-21.k51.rocksdb"
+    output:
+        manysearch=f"{outdir}/bins-x-ncbi-entire.manysearch.csv"
+    log: f"{outdir}/logs/bins-x-ncbi-entire.manysearch.log"
+    benchmark: f"{outdir}/logs/bins-x-ncbi-entire.manysearch.benchmark"
+    shell:
+        """
+        sourmash scripts manysearch --scaled 10_000 -k 51 {input.zip} {input.db} -o {output.manysearch} > {log} 2>&1
         """
 
 # now aggregate and assess the results
