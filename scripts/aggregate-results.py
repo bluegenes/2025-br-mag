@@ -17,8 +17,6 @@ SPECIES_ALIASES = {
     "Acanthamoeba polyphaga mimivirus": ["Acanthamoeba polyphaga mimivirus", "Mimivirus bradfordmassiliense"]
 }
 
-NCBI_EXCLUDE_GENUS = {g.strip().lower() for g in ["Acanthamoeba"]} 
-
 @dataclass
 class AccessionResult:
 
@@ -69,7 +67,6 @@ class AccessionResult:
     def to_dict(self):
         return asdict(self)
 
-
 def write_results_csv(results: list[AccessionResult], outpath: str):
     with open(outpath, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(AccessionResult.__annotations__.keys()))
@@ -118,7 +115,7 @@ def summarize_results(results: list[AccessionResult], expected_map: dict):
 
     correct_species = sum(r.mgx_expected_species_found for r in results)
     correct_genus = sum(r.mgx_expected_genus_found for r in results)
-    print("\n=== EXACT GENOMES X METAGENOMES ===")
+    print("\n=== SEARCH GENOMES X METAGENOMES ===")
     print(f"Total expected metagenome matches: {total_expected}")
     print(f"Correct species matches: {correct_species} / {total_expected}")
     print(f"Correct genus matches: {correct_genus} / {total_expected}")
@@ -127,7 +124,7 @@ def summarize_results(results: list[AccessionResult], expected_map: dict):
     valid_bins = [r for r in results if r.total_n_bins > 0]
     bin_species = sum(r.exact_bin_match_level == "species" for r in valid_bins)
     bin_genus = sum(r.exact_bin_match_level in ("species","genus") for r in valid_bins)
-    print("\n=== BINS X EXACT GENOMES ===")
+    print("\n=== BINS X SEARCH GENOMES ===")
     print(f"Metagenomes with bin species match: {bin_species} / {len(valid_bins)}")
     print(f"Metagenomes with bin genus match: {bin_genus} / {len(valid_bins)}")
 
@@ -140,7 +137,7 @@ def summarize_results(results: list[AccessionResult], expected_map: dict):
     # === NCBI bins ===
     ncbi_species = sum(r.ncbi_bin_match_level == "species" for r in valid_bins)
     ncbi_genus = sum(r.ncbi_bin_match_level in ("species","genus") for r in valid_bins)
-    print("\n=== BINS X NCBI GENOMES ===")
+    print("\n=== BINS X NCBI DATABASE ===")
     print(f"Metagenomes with bin species match: {ncbi_species} / {len(valid_bins)}")
     print(f"Metagenomes with bin genus match: {ncbi_genus} / {len(valid_bins)}")
 
@@ -180,7 +177,7 @@ def summarize_results(results: list[AccessionResult], expected_map: dict):
     ss_species = sum(r.sendsketch_bin_match_level == "species" for r in valid_ss)
     ss_genus   = sum(r.sendsketch_bin_match_level in ("species", "genus") for r in valid_ss)
 
-    print("\n=== SENDSKETCH SUMMARY ===")
+    print("\n=== SENDSKETCH BINS ===")
     print(f"Metagenomes with SendSketch species match: {ss_species} / {len(valid_ss)}")
     print(f"Metagenomes with SendSketch genus match: {ss_genus} / {len(valid_ss)}")
 
@@ -208,14 +205,21 @@ def accession_summary_table(results: list[AccessionResult]) -> list[dict]:
             if r.mgx_f_weighted_target_in_query not in (None, "") else ""
         )
 
+        bat_support_pct = (
+            f"{float(r.bat_bin_support) * 100:.1f}"
+            if r.bat_bin_support not in (None, "") else ""
+        )
+
+
         row = {
             "Accession": r.accession,
             "ExpectedSpecies": r.expected_species,
             "cANI": mgx_cANI,
             "% mgx": mgx_pct,
-            "ExactBins": r.exact_bin_match_level,
-            "NCBI_Bins": r.ncbi_bin_match_level,
+            "Bins_x_SearchGx": r.exact_bin_match_level,
+            "Bins_x_NCBI": r.ncbi_bin_match_level,
             "BAT_Bins": r.bat_bin_match_level,
+            "BAT_Bins_support": bat_support_pct,
             "BAT_ORFs": r.bat_orf_match_level,
             "SendSketch": r.sendsketch_bin_match_level,
         }
@@ -225,13 +229,13 @@ def accession_summary_table(results: list[AccessionResult]) -> list[dict]:
 def write_accession_summary(results: list[AccessionResult],
                             out_csv: str | None = None):
     """
-    Write accession-level summary to stdout, and also to CSV if out_csv is provided.
+    Write metagenome-level summary to stdout, and also to CSV if out_csv is provided.
     """
     table = accession_summary_table(results)
     header = list(table[0].keys()) if table else []
 
     # --- Print to stdout ---
-    print("\n=== ACCESSION-LEVEL SUMMARY ===")
+    print("\n=== METAGENOME-LEVEL SUMMARY ===")
     print("\t".join(header))
     for row in table:
         print("\t".join(str(row[h]) for h in header))
@@ -256,7 +260,7 @@ def prep_expected_taxonomy(expected_csv: str) -> dict:
       }
     """
     expected_map = OrderedDict()
-    with open(expected_csv, newline="", encoding="utf-8-sig") as f:
+    with open(expected_csv, encoding="utf-8-sig") as f:
         reader = csv.reader(f)
         for row in reader:
             if not row or len(row) < 3:
@@ -275,7 +279,7 @@ def load_bins_file(bins_file: str) -> dict:
     Load bins file and return a mapping of accession to number of bins.
     """
     bins_per_acc = {}
-    with open(bins_file) as f:
+    with open(bins_file, encoding="utf-8-sig") as f:
         for line in f:
             path = line.strip()
             if not path:
@@ -381,18 +385,100 @@ def check_ncbi_bins_for_accession(acc: str,
     else:
         return "unmatched", 0, None, None
 
+def process_bat_bin_records(records: list[dict], g_aliases: list[str], s_aliases: list[str]) -> tuple[str, Optional[float]]:
+    """
+    Process parsed BAT bin2classification.taxnames.txt rows.
+    Return (bin_match_level, bin_support).
+    """
+    bin_match_level = "unmatched"
+    bin_support = None
+
+    for row in records:
+        lineage_text = row.get("lineage scores (f: 0.30)", "")  # contains "Genus: 0.95 Species: 0.91" style
+        genus = row['genus']
+        species = row['species']
+
+        if species != "no support" and species != "NA" and species != None:
+            try:
+                name, score_str = species.split(": ")
+                # account for any trailing '*'
+                name = name.rstrip("*").strip()
+                score = float(score_str)
+            except ValueError:
+                print(f"WARNING: could not parse species and score from row {row}")
+                continue
+            if any(alias.lower() == name.lower() for alias in s_aliases):
+                # make sure we're saving the best species score
+                if bin_match_level != "species" or (bin_support is None or score > bin_support):
+                    bin_match_level, bin_support = "species", score
+
+        # --- Genus check (only if no species support was found) ---
+        if bin_match_level != "species":
+            # check genus aliases
+            if genus != "no support" and genus != "NA" and species != None:
+                try:
+                    name, score_str = genus.split(": ")
+                    # account for any trailing '*'
+                    name = name.rstrip("*").strip()
+                    score = float(score_str)
+                except ValueError:
+                    print(f"WARNING: could not parse genus and score from row {row}")
+                    continue
+                if any(alias.lower() == name.lower() for alias in g_aliases):
+                    if bin_match_level != "genus" or (bin_support is None or score > bin_support):
+                        bin_match_level, bin_support = "genus", score
+
+    return bin_match_level, bin_support
+
+def load_bat_orf_file(path: str) -> list[dict]:
+    """
+    Load a BAT ORF2LCA.taxnames.txt file into dicts.
+    First 5 fields are fixed, the rest are merged into 'full_lineage_names'.
+    """
+    records = []
+    with open(path, newline="") as f:
+        reader = csv.reader(f, delimiter="\t")
+        header = next(reader)
+        # Normalize to expected first 5 columns
+        base_fields = ["ORF", "bin", "n_hits", "lineage", "top_bit_score"]
+        for row in reader:
+            if not row or row[0].startswith("#"):
+                continue
+            base = row[:5]
+            extra = row[5:]
+            rec = {k: v for k, v in zip(base_fields, base)}
+            rec["full_lineage_names"] = "\t".join(extra)
+            records.append(rec)
+    return records
+
+
+def process_bat_orf_records(records: list[dict], g_aliases: list[str], s_aliases: list[str]) -> str:
+    """
+    Process parsed BAT ORF2LCA.taxnames.txt rows.
+    Return orf_match_level ("species", "genus", "unmatched").
+    """
+    orf_match_level = "unmatched"
+
+    for row in records:
+        lineage_text = row.get("full_lineage_names", "")
+        if not lineage_text:
+            continue
+
+        if any(alias.lower() in lineage_text.lower() for alias in s_aliases):
+            return "species"
+        if orf_match_level != "species" and any(alias.lower() in lineage_text.lower() for alias in g_aliases):
+            orf_match_level = "genus"
+
+    return orf_match_level
+
 
 def check_bat_for_accession(acc: str,
                             exp_genus: str,
                             exp_species: str,
-                            bat_dir="output.BAT") -> tuple[str, float | None, str]:
+                            bat_dir="output.BAT") -> tuple[str, Optional[float], str]:
     """
     Return (bat_bin_match_level, bat_bin_support, bat_orf_match_level).
     """
-    bin_match_level = "unmatched"
-    bin_support = None
-    orf_match_level = "unmatched"
-
     acc_dir = os.path.join(bat_dir, acc)
     bin_file = os.path.join(acc_dir, "out.BAT.bin2classification.taxnames.txt")
     orf_file = os.path.join(acc_dir, "out.BAT.ORF2LCA.taxnames.txt")
@@ -401,45 +487,19 @@ def check_bat_for_accession(acc: str,
 
     # --- Bin classifications ---
     if os.path.exists(bin_file):
-        with open(bin_file) as f:
-            for line in f:
-                if line.startswith("#") or not line.strip():
-                    continue
-                parts = line.strip().split("\t")
-                if len(parts) < 6:
-                    continue
-                classification_text = " ".join(parts[5:])
-
-                # species first
-                for alias in s_aliases:
-                    m = re.search(rf"{re.escape(alias)}:\s*([\d.]+)", classification_text, re.I)
-                    if m:
-                        score = float(m.group(1))
-                        if bin_match_level != "species" or (bin_support is None or score > bin_support):
-                            bin_match_level, bin_support = "species", score
-                # genus if no species
-                if bin_match_level != "species":
-                    for alias in g_aliases:
-                        m = re.search(rf"{re.escape(alias)}:\s*([\d.]+)", classification_text, re.I)
-                        if m:
-                            score = float(m.group(1))
-                            if bin_match_level != "genus" or (bin_support is None or score > bin_support):
-                                bin_match_level, bin_support = "genus", score
+        with open(bin_file, newline="") as f:
+            reader = csv.DictReader(f, delimiter="\t")
+            bin_records = list(reader)
+        bin_match_level, bin_support = process_bat_bin_records(bin_records, g_aliases, s_aliases)
     else:
-        bin_match_level = "NA"
+        bin_match_level, bin_support = "NA", None
 
     # --- ORF classifications ---
     if os.path.exists(orf_file):
-        with open(orf_file) as f:
-            for line in f:
-                if line.startswith("#") or not line.strip():
-                    continue
-                if any(alias.lower() in line.lower() for alias in s_aliases):
-                    orf_match_level = "species"
-                    break
-                if orf_match_level != "species":
-                    if any(alias.lower() in line.lower() for alias in g_aliases):
-                        orf_match_level = "genus"
+        recs = load_bat_orf_file(orf_file)
+        orf_match_level = process_bat_orf_records(recs, g_aliases, s_aliases)
+    else:
+        orf_match_level = "NA"
 
     return bin_match_level, bin_support, orf_match_level
 
