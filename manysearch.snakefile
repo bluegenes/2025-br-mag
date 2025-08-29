@@ -25,6 +25,9 @@ rule all:
         f"{outdir}/bins-x-search-genomes.multisearch.sc1000.csv",
         f"{outdir}/bins-x-search-genomes.multisearch.sc10.csv",
         f"{outdir}/bins-x-ncbi-entire.manysearch.csv",
+        # f"{outdir}/bins-x-ncbi-euks.manysearch.sc1000.csv",
+        #f"{outdir}/bins-x-ncbi-euks.prefetch.sc1000.csv",
+        f"{outdir}/bins-x-ncbi-euks.multisearch.sc1000.csv",
 
 
 
@@ -185,5 +188,38 @@ rule sourmash_manysearch_ncbi_entire:
         """
         sourmash scripts manysearch --scaled 10_000 -k 51 {input.zip} {input.db} -o {output.manysearch} > {log} 2>&1
         """
+
+rule sourmash_multisearch_ncbi_euk_zips:
+    input:
+        zip=f"{outdir}/bins.sig.zip",
+        fungi="/group/ctbrowngrp5/sourmash-db/genbank-2025.04/genbank-20250408-fungi-k51.zip",
+        euk_other="/group/ctbrowngrp5/2025-genbank-eukaryotes/eukaryotes-other.sig.zip",
+        bilateria_minus_verts="/group/ctbrowngrp5/2025-genbank-eukaryotes/bilateria-minus-vertebrates.sig.zip",
+        db_txt="euk-dbs.txt"
+    output:
+        multisearch=f"{outdir}/bins-x-ncbi-euks.multisearch.sc1000.csv"
+    log: f"{outdir}/logs/bins-x-ncbi-entire.multisearch.sc1000.log"
+    benchmark: f"{outdir}/logs/bins-x-ncbi-euk.multisearch.sc1000.benchmark"
+    shell:
+        """
+        sourmash scripts multisearch --scaled 1_000 -m DNA -k 51 --ani {input.zip} {input.db_txt} -o {output.multisearch} > {log} 2>&1
+        """
+
+rule sourmash_manysearch_ncbi_euk_zips:
+    input:
+        zip=f"{outdir}/bins.sig.zip",
+#        fungi="/group/ctbrowngrp5/sourmash-db/genbank-2025.04/genbank-20250408-fungi-k51.zip",
+#        euk_other="/group/ctbrowngrp5/2025-genbank-eukaryotes/eukaryotes-other.sig.zip",
+#        bilateria_minus_verts="/group/ctbrowngrp5/2025-genbank-eukaryotes/bilateria-minus-vertebrates.sig.zip",
+        db_txt="euk-dbs.txt"
+    output:
+        manysearch=f"{outdir}/bins-x-ncbi-euks.manysearch.sc1000.csv"
+    log: f"{outdir}/logs/bins-x-ncbi-entire.manysearch.sc1000.log"
+    benchmark: f"{outdir}/logs/bins-x-ncbi-euk.manysearch.sc1000.benchmark"
+    shell:
+        """
+        sourmash scripts manysearch --scaled 1_000 -k 51 {input.zip} {input.db_txt} -o {output.manysearch} > {log} 2>&1
+        """
+        #sourmash scripts manysearch --scaled 1_000 -k 51 {input.zip} {input.fungi} {input.euk_other} {input.bilateria_minus_verts} -o {output.manysearch} > {log} 2>&1
 
 # now aggregate and assess the results
