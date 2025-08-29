@@ -191,39 +191,58 @@ def summarize_results(results: list[AccessionResult], expected_map: dict):
             print(f"  {r.accession} — expected {r.expected_species}")
 
 
-def print_accession_summary(results: list[AccessionResult]):
+def accession_summary_table(results: list[AccessionResult]) -> list[dict]:
     """
-    Print an accession-level summary of match levels across all tools.
+    Build a table of accession-level summary results across all tools.
+    Returns list of dicts (rows).
     """
-    header = [
-        "Accession",
-        "cANI",
-        "% mgx",
-        "ExactBins",
-        "NCBI_Bins",
-        "BAT_Bins",
-        "BAT_ORFs",
-        "SendSketch",
-    ]
+    table = []
+    for r in results:
+        # MGX: grab k21 cANI, % metagenome
+        mgx_cANI = (
+            f"{float(r.mgx_k21_cANI) * 100:.1f}"
+            if r.mgx_k21_cANI not in (None, "") else ""
+        )
+        mgx_pct = (
+            f"{float(r.mgx_f_weighted_target_in_query) * 100:.1f}"
+            if r.mgx_f_weighted_target_in_query not in (None, "") else ""
+        )
+
+        row = {
+            "Accession": r.accession,
+            "ExpectedSpecies": r.expected_species,
+            "cANI": mgx_cANI,
+            "% mgx": mgx_pct,
+            "ExactBins": r.exact_bin_match_level,
+            "NCBI_Bins": r.ncbi_bin_match_level,
+            "BAT_Bins": r.bat_bin_match_level,
+            "BAT_ORFs": r.bat_orf_match_level,
+            "SendSketch": r.sendsketch_bin_match_level,
+        }
+        table.append(row)
+    return table
+
+def write_accession_summary(results: list[AccessionResult],
+                            out_csv: str | None = None):
+    """
+    Write accession-level summary to stdout, and also to CSV if out_csv is provided.
+    """
+    table = accession_summary_table(results)
+    header = list(table[0].keys()) if table else []
+
+    # --- Print to stdout ---
     print("\n=== ACCESSION-LEVEL SUMMARY ===")
     print("\t".join(header))
+    for row in table:
+        print("\t".join(str(row[h]) for h in header))
 
-    for r in results:
-        # MGX: grab k31 cANI, % metagenome
-        mgx_cANI = f"{float(r.mgx_k21_cANI) * 100:.1f}" if r.mgx_k21_cANI not in (None, "") else ""
-        mgx_pct = f"{float(r.mgx_f_weighted_target_in_query) * 100:.1f}" if r.mgx_f_weighted_target_in_query not in (None, "") else ""
-
-        row = [
-            r.accession,
-            mgx_cANI,
-            mgx_pct,
-            r.exact_bin_match_level,
-            r.ncbi_bin_match_level,
-            r.bat_bin_match_level,
-            r.bat_orf_match_level,
-            r.sendsketch_bin_match_level,
-        ]
-        print("\t".join(str(x) for x in row))
+    # --- Write CSV if requested ---
+    if out_csv:
+        with open(out_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=header)
+            writer.writeheader()
+            writer.writerows(table)
+        print(f"\nWrote accession summary to '{out_csv}'")
 
 
 def prep_expected_taxonomy(expected_csv: str) -> dict:
@@ -530,7 +549,7 @@ def main(args):
     summarize_results(results, expected_map)
 
     # --- Summarize by Accession ---
-    print_accession_summary(results)
+    write_accession_summary(results, out_csv="multi-accession-summary.csv")
 
 
 if __name__ == "__main__":
