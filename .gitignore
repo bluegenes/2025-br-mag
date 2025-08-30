@@ -5,3 +5,10 @@ output.*
 testbins*
 *zip
 multi/*
+*fasta*
+*fastq*
+ERR*/
+SRR*/
+*tar.gz
+metagenomes/*
+*bak

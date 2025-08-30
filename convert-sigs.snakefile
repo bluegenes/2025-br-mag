@@ -14,14 +14,14 @@ sig_set_basename = "br-magtest"
 
 rule all:
     input:
-        expand("/group/ctbrowngrp5/wort-sra-zips/{acc}.sig.zip", acc=metagenomes),
-        expand("/group/ctbrowngrp5/wort-sra-zips/{acc}.mf.csv", acc=metagenomes),
+        expand("metagenomes/{acc}.sig.zip", acc=metagenomes),
+        expand("metagenomes/{acc}.mf.csv", acc=metagenomes),
         f"{sig_set_basename}.wort.mf.csv",
     
 
 rule make_sig_zip:
     input: "/group/ctbrowngrp/irber/data/wort-data/wort-sra/sigs/{acc}.sig"
-    output: "/group/ctbrowngrp5/wort-sra-zips/{acc}.sig.zip"
+    output: "metagenomes/{acc}.sig.zip"
     resources:
         slurm_partition="low2",
         mem_mb=lambda wildcards, attempt: attempt * 3000, # 3 GB per attempt
@@ -33,8 +33,8 @@ rule make_sig_zip:
         """
 
 rule make_mf_csv:
-    input: "/group/ctbrowngrp5/wort-sra-zips/{acc}.sig.zip"
-    output: "/group/ctbrowngrp5/wort-sra-zips/{acc}.mf.csv"
+    input: "metagenomes/{acc}.sig.zip"
+    output: "metagenomes/{acc}.mf.csv"
     resources:
         slurm_partition="low2",
         mem_mb=lambda wildcards, attempt: attempt * 3000, # 3 GB per attempt
@@ -45,7 +45,7 @@ rule make_mf_csv:
         """
 
 rule aggregate_mf_csv:
-    input: expand("/group/ctbrowngrp5/wort-sra-zips/{acc}.mf.csv", acc=metagenomes)
+    input: expand("metagenomes/{acc}.mf.csv", acc=metagenomes)
     output: f"{sig_set_basename}.wort.mf.csv"
     resources:
         slurm_partition="low2",
@@ -53,5 +53,5 @@ rule aggregate_mf_csv:
         runtime=240,
     shell:
         """
-        sourmash sig collect {input} -o {output} -F csv --abspath
+        sourmash sig collect {input} -o {output} -F csv --relpath
         """

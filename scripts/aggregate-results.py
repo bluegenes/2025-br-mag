@@ -34,34 +34,34 @@ class AccessionResult:
     organism: Optional[str] = None
 
     # mgx results
-    mgx_expected_genus_found: bool = False
-    mgx_expected_species_found: bool = False
-    mgx_containment: Optional[float] = None
-    mgx_containment_target_in_query: Optional[float] = None
-    mgx_f_weighted_target_in_query: Optional[float] = None
-    
-    # branchwater-web results
+    # original branchwater-web results
     mgx_k21_cANI: Optional[float] = None
     mgx_k21_containment: Optional[float] = None
-
+    # k31 manysearch results
+    mgx_expected_genus_found: bool = False
+    mgx_expected_species_found: bool = False
+    mgx_k31_containment: Optional[float] = None
+    mgx_k31_containment_target_in_query: Optional[float] = None
+    mgx_k31_f_weighted_target_in_query: Optional[float] = None
+    
     # bin results
-    total_n_bins: int = 0
-    exact_bin_match_level: str = "unmatched"
-    exact_n_bins_with_match: int = 0
-    bin_ani_to_top_match_exact: Optional[float] = None
+    nbins: int = 0
+    bins_x_searchgx_match_level: str = "unmatched"
+    bins_x_searchgx_nbins_matched: int = 0
+    bins_x_searchgx_topANI: Optional[float] = None
 
-    ncbi_bin_match_level: str = "unmatched"
-    ncbi_n_bins_with_match: int = 0
-    bin_ani_to_top_match_ncbi: Optional[float] = None
-    bin_ani_top_match_name_ncbi: Optional[str] = None
+    bins_x_ncbi_match_level: str = "unmatched"
+    bins_x_ncbi_nbins_matched: int = 0
+    bins_x_ncbi_topANI: Optional[float] = None
+    bins_x_ncbi_top_match_name: Optional[str] = None
 
     # BAT results
-    bat_bin_match_level: str = "unmatched"
-    bat_bin_support: Optional[float] = None
-    bat_orf_match_level: str = "unmatched"
+    bins_x_batNR_match_level: str = "unmatched"
+    bins_x_batNR_support: Optional[float] = None
+    orfs_x_batNR_match_level: str = "unmatched"
 
     # sendsketch results
-    sendsketch_bin_match_level: str = "unmatched"
+    bins_x_sendsketch_match_level: str = "unmatched"
     
 
     def to_dict(self):
@@ -121,133 +121,190 @@ def summarize_results(results: list[AccessionResult], expected_map: dict):
     print(f"Correct genus matches: {correct_genus} / {total_expected}")
 
     # === Exact bins ===
-    valid_bins = [r for r in results if r.total_n_bins > 0]
-    bin_species = sum(r.exact_bin_match_level == "species" for r in valid_bins)
-    bin_genus = sum(r.exact_bin_match_level in ("species","genus") for r in valid_bins)
+    valid_bins = [r for r in results if r.nbins > 0]
+    bin_species = sum(r.bins_x_searchgx_match_level == "species" for r in valid_bins)
+    bin_genus = sum(r.bins_x_searchgx_match_level in ("species","genus") for r in valid_bins)
     print("\n=== BINS X SEARCH GENOMES ===")
     print(f"Metagenomes with bin species match: {bin_species} / {len(valid_bins)}")
     print(f"Metagenomes with bin genus match: {bin_genus} / {len(valid_bins)}")
 
-    missing_bin_matches = [r for r in valid_bins if r.exact_bin_match_level == "unmatched"]
+    missing_bin_matches = [r for r in valid_bins if r.bins_x_searchgx_match_level == "unmatched"]
     if missing_bin_matches:
         print("No bin species/genus match:")
         for r in missing_bin_matches:
-            print(f"  {r.accession} — expected {r.expected_species} ({r.total_n_bins} bins)")
+            print(f"  {r.accession} — expected {r.expected_species} ({r.nbins} bins)")
 
     # === NCBI bins ===
-    ncbi_species = sum(r.ncbi_bin_match_level == "species" for r in valid_bins)
-    ncbi_genus = sum(r.ncbi_bin_match_level in ("species","genus") for r in valid_bins)
+    ncbi_species = sum(r.bins_x_ncbi_match_level == "species" for r in valid_bins)
+    ncbi_genus = sum(r.bins_x_ncbi_match_level in ("species","genus") for r in valid_bins)
     print("\n=== BINS X NCBI DATABASE ===")
     print(f"Metagenomes with bin species match: {ncbi_species} / {len(valid_bins)}")
     print(f"Metagenomes with bin genus match: {ncbi_genus} / {len(valid_bins)}")
 
-    missing_ncbi = [r for r in valid_bins if r.ncbi_bin_match_level == "unmatched"]
+    missing_ncbi = [r for r in valid_bins if r.bins_x_ncbi_match_level == "unmatched"]
     if missing_ncbi:
         print("\nNo bin species/genus match (NCBI manysearch):")
         for r in missing_ncbi:
-            print(f"  {r.accession} — expected {r.expected_species} ({r.total_n_bins} bins)")
+            print(f"  {r.accession} — expected {r.expected_species} ({r.nbins} bins)")
 
     # === BAT ===
-    bat_species = sum(r.bat_bin_match_level == "species" for r in results)
-    bat_genus = sum(r.bat_bin_match_level in ("species","genus") for r in results)
+    bat_species = sum(r.bins_x_batNR_match_level == "species" for r in results)
+    bat_genus = sum(r.bins_x_batNR_match_level in ("species","genus") for r in results)
     print("\n=== BAT CLASSIFICATION SUMMARY ===")
     print(f"Metagenomes with BAT bin species match: {bat_species} / {len(results)}")
     print(f"Metagenomes with BAT bin genus match: {bat_genus} / {len(results)}")
 
-    orf_species = sum(r.bat_orf_match_level == "species" for r in results)
-    orf_genus = sum(r.bat_orf_match_level in ("species","genus") for r in results)
+    orf_species = sum(r.orfs_x_batNR_match_level == "species" for r in results)
+    orf_genus = sum(r.orfs_x_batNR_match_level in ("species","genus") for r in results)
     print(f"Metagenomes with BAT ORF species match: {orf_species} / {len(results)}")
     print(f"Metagenomes with BAT ORF genus match: {orf_genus} / {len(results)}")
 
-    missing_bat_bins = [r for r in results if r.bat_bin_match_level == "unmatched"]
+    missing_bat_bins = [r for r in results if r.bins_x_batNR_match_level == "unmatched"]
     if missing_bat_bins:
         print("\nNo BAT bin species/genus match:")
         for r in missing_bat_bins:
-            print(f"  {r.accession} — expected {r.expected_species} ({r.total_n_bins} bins)")
+            print(f"  {r.accession} — expected {r.expected_species} ({r.nbins} bins)")
 
-    missing_bat_orfs = [r for r in results if r.bat_orf_match_level == "unmatched"]
+    missing_bat_orfs = [r for r in results if r.orfs_x_batNR_match_level == "unmatched"]
     if missing_bat_orfs:
         print("\nNo BAT ORF species/genus match:")
         for r in missing_bat_orfs:
             print(f"  {r.accession} — expected {r.expected_species}")
     
     # === SENDSKETCH ===
-    valid_ss = [r for r in results if r.sendsketch_bin_match_level != "NA"]
+    valid_ss = [r for r in results if r.bins_x_sendsketch_match_level != "NA"]
 
-    ss_species = sum(r.sendsketch_bin_match_level == "species" for r in valid_ss)
-    ss_genus   = sum(r.sendsketch_bin_match_level in ("species", "genus") for r in valid_ss)
+    ss_species = sum(r.bins_x_sendsketch_match_level == "species" for r in valid_ss)
+    ss_genus   = sum(r.bins_x_sendsketch_match_level in ("species", "genus") for r in valid_ss)
 
     print("\n=== SENDSKETCH BINS ===")
     print(f"Metagenomes with SendSketch species match: {ss_species} / {len(valid_ss)}")
     print(f"Metagenomes with SendSketch genus match: {ss_genus} / {len(valid_ss)}")
 
-    missing_ss = [r for r in valid_ss if r.sendsketch_bin_match_level == "unmatched"]
+    missing_ss = [r for r in valid_ss if r.bins_x_sendsketch_match_level == "unmatched"]
     if missing_ss:
         print("\nNo SendSketch species/genus match:")
         for r in missing_ss:
             print(f"  {r.accession} — expected {r.expected_species}")
 
 
-def accession_summary_table(results: list[AccessionResult]) -> list[dict]:
+def accession_summary_table(results: list[AccessionResult]) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     """
     Build a table of accession-level summary results across all tools.
-    Returns list of dicts (rows).
+    Returns (all_rows, unmatched_rows).
     """
     table = []
+    nobins = []
+    unmatched = []
+    orf_match_only = []
     for r in results:
-        # MGX: grab k21 cANI, % metagenome
         mgx_cANI = (
             f"{float(r.mgx_k21_cANI) * 100:.1f}"
             if r.mgx_k21_cANI not in (None, "") else ""
         )
         mgx_pct = (
-            f"{float(r.mgx_f_weighted_target_in_query) * 100:.1f}"
-            if r.mgx_f_weighted_target_in_query not in (None, "") else ""
+            f"{float(r.mgx_k31_f_weighted_target_in_query) * 100:.1f}"
+            if r.mgx_k31_f_weighted_target_in_query not in (None, "") else ""
         )
-
         bat_support_pct = (
-            f"{float(r.bat_bin_support) * 100:.1f}"
-            if r.bat_bin_support not in (None, "") else ""
+            f"{float(r.bins_x_batNR_support) * 100:.1f}"
+            if r.bins_x_batNR_support not in (None, "") else ""
         )
-
 
         row = {
             "Accession": r.accession,
             "ExpectedSpecies": r.expected_species,
             "cANI": mgx_cANI,
             "% mgx": mgx_pct,
-            "Bins_x_SearchGx": r.exact_bin_match_level,
-            "Bins_x_NCBI": r.ncbi_bin_match_level,
-            "BAT_Bins": r.bat_bin_match_level,
+            "n_bins": r.nbins,
+            "Bins_x_SearchGx": r.bins_x_searchgx_match_level,
+            "Bins_x_NCBI": r.bins_x_ncbi_match_level,
+            "BAT_Bins": r.bins_x_batNR_match_level,
             "BAT_Bins_support": bat_support_pct,
-            "BAT_ORFs": r.bat_orf_match_level,
-            "SendSketch": r.sendsketch_bin_match_level,
+            "BAT_ORFs": r.orfs_x_batNR_match_level,
+            "SendSketch": r.bins_x_sendsketch_match_level,
         }
+
+        # separate no bins
+        if r.nbins == 0:
+            nobins.append(row)
+            continue
+
+        # separate unmatched bins (no species/genus match in any tool)
+
+        # check if unmatched across all tools
+        bin_has_species = (
+            r.bins_x_searchgx_match_level == "species"
+            or r.bins_x_ncbi_match_level == "species"
+            or r.bins_x_batNR_match_level == "species"
+            or r.bins_x_sendsketch_match_level == "species"
+        )
+        bin_has_genus = (
+            r.bins_x_searchgx_match_level in ("species", "genus")
+            or r.bins_x_ncbi_match_level in ("species", "genus")
+            or r.bins_x_batNR_match_level in ("species", "genus")
+            or r.bins_x_sendsketch_match_level in ("species", "genus")
+        )
+
+        orf_has_match = r.orfs_x_batNR_match_level in ("species", "genus")
+
+        if not bin_has_species and not bin_has_genus:
+            if orf_has_match:
+                orf_match_only.append(row)
+                continue
+            else:
+                unmatched.append(row)
+                continue
+        
         table.append(row)
-    return table
+        
+    return table, nobins, unmatched, orf_match_only
 
 def write_accession_summary(results: list[AccessionResult],
                             out_csv: str | None = None):
     """
     Write metagenome-level summary to stdout, and also to CSV if out_csv is provided.
     """
-    table = accession_summary_table(results)
+    table, nobins, unmatched, orf_match_only = accession_summary_table(results)
     header = list(table[0].keys()) if table else []
 
-    # --- Print to stdout ---
-    print("\n=== METAGENOME-LEVEL SUMMARY ===")
+    # --- Print matched summary ---
+    print("\n=== BIN SUMMARY ===")
     print("\t".join(header))
     for row in table:
         print("\t".join(str(row[h]) for h in header))
 
+    # --- Print no bins ---
+    if nobins:
+        print("\n=== NO BINS ===")
+        print("\t".join(header))
+        for row in nobins:
+            print("\t".join(str(row[h]) for h in header))
+
+    # --- Print ORF match only ---
+    if orf_match_only:
+        print("\n=== ORF MATCH ONLY (no bin-level species/genus match) ===")
+        print("\t".join(header))
+        for row in orf_match_only:
+            print("\t".join(str(row[h]) for h in header))
+
+    # --- Print unmatched ---
+    if unmatched:
+        print("\n=== UNMATCHED BINS (no species/genus match) ===")
+        print("\t".join(header))
+        for row in unmatched:
+            print("\t".join(str(row[h]) for h in header))
+    
     # --- Write CSV if requested ---
     if out_csv:
         with open(out_csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=header)
             writer.writeheader()
             writer.writerows(table)
+            writer.writerows(nobins)
+            writer.writerows(orf_match_only)
+            writer.writerows(unmatched)
         print(f"\nWrote accession summary to '{out_csv}'")
-
 
 def prep_expected_taxonomy(expected_csv: str) -> dict:
     """
@@ -358,7 +415,7 @@ def check_exact_bins_for_accession(acc: str,
         return "unmatched", 0, None
 
 
-def check_ncbi_bins_for_accession(acc: str,
+def aggregate_sourmash_ncbi(acc: str,
                                   exp_genus: str,
                                   exp_species: str,
                                   ncbi_bins: list[dict]) -> tuple[str, int, float | None, str | None]:
@@ -370,6 +427,9 @@ def check_ncbi_bins_for_accession(acc: str,
 
     rows = [r for r in ncbi_bins if r["metagenome_accession"] == acc]
     if not rows:
+        # special case: NCBI is missing Mimivirus/Acanthamoeba
+        if exp_genus in ("Acanthamoeba", "Mimivirus") or "mimivirus" in exp_species.lower():
+            return "NA", 0, None, None
         return "unmatched", 0, None, None
 
     # species first
@@ -383,6 +443,9 @@ def check_ncbi_bins_for_accession(acc: str,
         best_row = max(g_rows, key=lambda r: r.get("average_containment_ani", 0))
         return "genus", len(g_rows), best_row.get("average_containment_ani"), best_row.get("match_name")
     else:
+        # again, apply special-case NA
+        if exp_genus in ("Acanthamoeba", "Mimivirus") or "mimivirus" in exp_species.lower():
+            return "NA", 0, None, None
         return "unmatched", 0, None, None
 
 def process_bat_bin_records(records: list[dict], g_aliases: list[str], s_aliases: list[str]) -> tuple[str, Optional[float]]:
@@ -477,7 +540,7 @@ def check_bat_for_accession(acc: str,
                             exp_species: str,
                             bat_dir="output.BAT") -> tuple[str, Optional[float], str]:
     """
-    Return (bat_bin_match_level, bat_bin_support, bat_orf_match_level).
+    Return (bins_x_batNR_match_level, bins_x_batNR_support, orfs_x_batNR_match_level).
     """
     acc_dir = os.path.join(bat_dir, acc)
     bin_file = os.path.join(acc_dir, "out.BAT.bin2classification.taxnames.txt")
@@ -541,16 +604,16 @@ def main(args):
                               expected_genus=tax["genus"],
                               expected_species=tax["species"])
 
-        res.total_n_bins = bins_per_acc.get(acc, 0)
+        res.nbins = bins_per_acc.get(acc, 0)
 
         # MGX Results
         mgx_row = mgx_results.get(acc)
         if mgx_row:
             res.mgx_expected_genus_found, res.mgx_expected_species_found = \
                 check_expected_in_text(mgx_row["query_name"], res.expected_genus, res.expected_species)
-            res.mgx_containment = float(mgx_row.get("containment") or 0)
-            res.mgx_containment_target_in_query = float(mgx_row.get("containment_target_in_query") or 0)
-            res.mgx_f_weighted_target_in_query = float(mgx_row.get("f_weighted_target_in_query") or 0)
+            res.mgx_k31_containment = float(mgx_row.get("containment") or 0)
+            res.mgx_k31_containment_target_in_query = float(mgx_row.get("containment_target_in_query") or 0)
+            res.mgx_k31_f_weighted_target_in_query = float(mgx_row.get("f_weighted_target_in_query") or 0)
         
         # Bin Results
         
@@ -571,28 +634,27 @@ def main(args):
             res.mgx_k21_cANI = sendsketch_row.get("cANI")
 
             # now actual sendsketch aggregated results
-            res.sendsketch_bin_match_level = sendsketch_row.get("match level", "unmatched")
+            res.bins_x_sendsketch_match_level = sendsketch_row.get("match level", "unmatched")
 
-
-        # sourmash x exact search genomes
-        res.exact_bin_match_level, res.exact_n_bins_with_match, res.bin_ani_to_top_match_exact = \
+        # sourmash bins x exact search genomes
+        res.bins_x_searchgx_match_level, res.bins_x_searchgx_nbins_matched, res.bins_x_searchgx_topANI = \
             check_exact_bins_for_accession(acc, res.expected_genus, res.expected_species, bins_df)
 
-        # sourmash search x NCBI
-        res.ncbi_bin_match_level, res.ncbi_n_bins_with_match, \
-        res.bin_ani_to_top_match_ncbi, res.bin_ani_top_match_name_ncbi = \
-            check_ncbi_bins_for_accession(acc, res.expected_genus, res.expected_species, ncbi_bins)
+        # sourmash search bins x NCBI
+        res.bins_x_ncbi_match_level, res.bins_x_ncbi_nbins_matched, \
+        res.bins_x_ncbi_topANI, res.bins_x_ncbi_top_match_name = \
+            aggregate_sourmash_ncbi(acc, res.expected_genus, res.expected_species, ncbi_bins)
 
-        # BAT annotation
-        res.bat_bin_match_level, res.bat_bin_support, res.bat_orf_match_level = \
+        # BAT bin annotation
+        res.bins_x_batNR_match_level, res.bins_x_batNR_support, res.orfs_x_batNR_match_level = \
             check_bat_for_accession(acc, res.expected_genus, res.expected_species, "output.BAT")
         
         # --- enforce NA if no bins ---
-        if res.total_n_bins == 0:
-            res.exact_bin_match_level = "NA"
-            res.ncbi_bin_match_level = "NA"
-            res.bat_bin_match_level = "NA"
-            res.bat_orf_match_level = "NA"
+        if res.nbins == 0:
+            res.bins_x_searchgx_match_level = "NA"
+            res.bins_x_ncbi_match_level = "NA"
+            res.bins_x_batNR_match_level = "NA"
+            res.orfs_x_batNR_match_level = "NA"
 
         results.append(res)
 

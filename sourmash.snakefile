@@ -7,30 +7,27 @@ search_genomes = {"GCF_000888735.1": "Acanthamoeba polyphaga mimivirus",
                   "GCF_003013715.1": "Candida auris",
                   "GCF_000165345.1": "Cryptosporidium parvum ",
                   "GCF_002217175.1": "Folsomia candida"}
-# metagenomes = [
-#     "ERR10162411", "ERR2819892", "SRR11734772", "SRR11734785", "SRR12217734", "SRR12959777", "SRR14842381", "SRR17231405", 
-#     "SRR18691112", "SRR18691152", "SRR18691161", "SRR20285055", "SRR20950787", "SRR2243572", "SRR3458563", "SRR5098319", 
-#     "SRR5190220", "SRR5190256", "SRR6144753", "SRR9016984", "ERR2185279", "ERR3333611", "SRR11734780", "SRR11734791", 
-#     "SRR12217748", "SRR14141927", "SRR16797981", "SRR17238487", "SRR18691151", "SRR18691155", "SRR20285028", "SRR20950657", 
-#     "SRR2105903", "SRR3458562", "SRR5098299", "SRR5190219", "SRR5190255", "SRR5831603", "SRR6144754", "SRR9016985",
-# ]
 
+bins_file = "multi_bins.txt"
+expected_taxonomy = "multi/multi_mapping.csv"
+sendsketch_results = "multi/multi.sendsketch.csv"
 
 rule all:
     input:
+        # sketches (search genomes and bins) 
         f"{outdir}/search-genomes.sig.zip",
+        f"{outdir}/bins.sig.zip",
+        # search genomes x metagenomes (branchwater k31, sc1000)
         f"{outdir}/search-genomes-x-brmetagenomes.manysearch.csv",
-        # f"{outdir}/search-genomes-x-brmetagenomes.manysearch.checked.csv",
+        # bins x search genomes
         f"{outdir}/bins-x-search-genomes.multisearch.csv",
-        f"{outdir}/bins-x-search-genomes.multisearch.sc1000.csv",
-        f"{outdir}/bins-x-search-genomes.multisearch.sc10.csv",
+        # bins x NCBI entire scaled 10,000
         f"{outdir}/bins-x-ncbi-entire.manysearch.csv",
-        # f"{outdir}/bins-x-ncbi-euks.manysearch.sc1000.csv",
-        #f"{outdir}/bins-x-ncbi-euks.prefetch.sc1000.csv",
+        # bins x NCBI euks scaled 1,000
         f"{outdir}/bins-x-ncbi-euks.multisearch.sc1000.csv",
 
 
-
+#### 1. Sketch the search genomes ####
 rule write_directsketch_csv:
     output:
         csv=f"{outdir}/search-genomes.gbsketch.csv"
@@ -43,6 +40,7 @@ rule write_directsketch_csv:
 
 
 rule sourmash_sketch_search_genomes:
+    # use scaled=100 to allow higher resolution search vs bins (sc100)
     input:
         csv=f"{outdir}/search-genomes.gbsketch.csv",
     output:
@@ -51,12 +49,14 @@ rule sourmash_sketch_search_genomes:
     benchmark: f"{outdir}/logs/sketch-search-genomes.benchmark"
     shell:
         """
-        sourmash scripts gbsketch -p dna,k=21,k=31,k=51,scaled=1000 {input.csv} -o {output.sig}
+        sourmash scripts gbsketch -p dna,k=21,k=31,k=51,scaled=100 {input.csv} -o {output.sig}
         """
 
+#### 2. Search the branchwater search genomes against the metagenomes, but with k=31 ###
 rule sourmash_manysearch_metagenomes:
     """
     search genomes against a set of metagenomes using sourmash manysearch
+    params: k 31, scaled 1000
     """
     input:
         genomes_zip=f"{outdir}/search-genomes.sig.zip",
@@ -71,6 +71,7 @@ rule sourmash_manysearch_metagenomes:
         sourmash scripts manysearch {input.genomes_zip} {input.metagenomes_mf} -k 31 --scaled 1000 --output {output.csv} > {log} 2>&1
         """
 
+#### 3. Sketch the MAG bins ####
 rule write_manysketch_bins_csv:
     input:
         bins="multi_bins.txt",
@@ -97,38 +98,15 @@ rule manysketch_bins:
         sourmash scripts manysketch -p dna,k=21,k=31,k=51,scaled=100 {input.csv} -o {output.sig}
         """
 
-rule manysketch_bins_sc10:
-    input:
-        csv=f"{outdir}/bins.manysketch.csv"
-    output:
-        sig=f"{outdir}/bins.sc10.sig.zip"
-    threads: 4
-    benchmark: f"{outdir}/logs/sketch-bins.benchmark"
-    shell:
-        """
-        sourmash scripts manysketch -p dna,k=21,k=31,k=51,scaled=10 {input.csv} -o {output.sig}
-        """
+#### 4. Use sourmash comparisons to identify/classify bins ####
 
-# better - just do the orig sketching as higher res.
-rule sourmash_sketch_search_genomes_highres:
-    input:
-        csv=f"{outdir}/search-genomes.gbsketch.csv",
-    output:
-        sig=f"{outdir}/search-genomes.sc10.sig.zip",
-    threads: 4
-    benchmark: f"{outdir}/logs/sketch-search-genomes.sc10.benchmark"
-    shell:
-        """
-        sourmash scripts gbsketch -p dna,k=21,k=31,k=51,scaled=10 {input.csv} -o {output.sig}
-        """
-
-# now search bins against the search genomes
-rule multisearch_bins_sc100:
+#### 4a. Compare bins against the search genomes ####
+rule multisearch_bins_x_search_genomes:
     """
     search bins against the search genomes using sourmash manysearch
     """
     input:
-        genomes_zip=f"{outdir}/search-genomes.sc10.sig.zip",
+        genomes_zip=f"{outdir}/search-genomes.sig.zip",
         bins_sig=f"{outdir}/bins.sig.zip",
     output:
         csv=f"{outdir}/bins-x-search-genomes.multisearch.csv"
@@ -140,43 +118,13 @@ rule multisearch_bins_sc100:
         sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 100 --output {output.csv} --ani -m DNA --threshold 0.001 > {log} 2>&1
         """
 
-rule multisearch_bins_sc10:
-    """
-    search bins against the search genomes using sourmash manysearch
-    """
-    input:
-        genomes_zip=f"{outdir}/search-genomes.sc10.sig.zip",
-        bins_sig=f"{outdir}/bins.sc10.sig.zip",
-    output:
-        csv=f"{outdir}/bins-x-search-genomes.multisearch.sc10.csv"
-    threads: 4
-    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc10.log"
-    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc10.benchmark"
-    shell:
-        """
-        sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 10 --output {output.csv} --ani -m DNA --threshold 0.01 > {log} 2>&1
-        """
-
-# do we really need the highres? try at sc1000
-rule multisearch_bins_sc1000:
-    """
-    search bins against the search genomes using sourmash manysearch
-    """
-    input:
-        genomes_zip=f"{outdir}/search-genomes.sig.zip",
-        bins_sig=f"{outdir}/bins.sig.zip",
-    output:
-        csv=f"{outdir}/bins-x-search-genomes.multisearch.sc1000.csv"
-    threads: 4
-    log: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc1000.log"
-    benchmark: f"{outdir}/logs/bins-x-search-genomes.multisearch.sc1000.benchmark"
-    shell:
-        """
-        sourmash scripts multisearch {input.bins_sig} {input.genomes_zip} -k 31 --scaled 1000 --output {output.csv} --ani -m DNA > {log} 2>&1
-        """
-
-
+#### 4b. Search the bins against NCBI database (scaled 10,000) ####
 rule sourmash_manysearch_ncbi_entire:
+    """
+    search bins against the entire NCBI database using sourmash manysearch
+    params: k 51, scaled 10000
+    database: entire-2025-01-21.k51.rocksdb
+    """
     input:
         zip=f"{outdir}/bins.sig.zip",
         db= "/group/ctbrowngrp5/sourmash-db/entire-2025-01-21/entire-2025-01-21.k51.rocksdb"
@@ -189,7 +137,13 @@ rule sourmash_manysearch_ncbi_entire:
         sourmash scripts manysearch --scaled 10_000 -k 51 {input.zip} {input.db} -o {output.manysearch} > {log} 2>&1
         """
 
+#### 4c. Search the bins against NCBI eukaryote databases (scaled 1000) ####
 rule sourmash_multisearch_ncbi_euk_zips:
+    """
+    search bins against the NCBI eukaryote databases using sourmash multisearch
+    params: k 51, scaled 1000, ani
+    databases: fungi, euk-other, bilateria-minus-verts
+    """
     input:
         zip=f"{outdir}/bins.sig.zip",
         fungi="/group/ctbrowngrp5/sourmash-db/genbank-2025.04/genbank-20250408-fungi-k51.zip",
@@ -205,21 +159,38 @@ rule sourmash_multisearch_ncbi_euk_zips:
         sourmash scripts multisearch --scaled 1_000 -m DNA -k 51 --ani {input.zip} {input.db_txt} -o {output.multisearch} > {log} 2>&1
         """
 
-rule sourmash_manysearch_ncbi_euk_zips:
+
+# 5. aggregate and assess the results
+rule aggregate_results:
+    """
+    aggregate the results sourmash, sendsketch, BAT annotation; compare to expected taxonomy
+    """
     input:
-        zip=f"{outdir}/bins.sig.zip",
-#        fungi="/group/ctbrowngrp5/sourmash-db/genbank-2025.04/genbank-20250408-fungi-k51.zip",
-#        euk_other="/group/ctbrowngrp5/2025-genbank-eukaryotes/eukaryotes-other.sig.zip",
-#        bilateria_minus_verts="/group/ctbrowngrp5/2025-genbank-eukaryotes/bilateria-minus-vertebrates.sig.zip",
-        db_txt="euk-dbs.txt"
+        expected_taxonomy=expected_taxonomy,
+        bins_file = bins_file,
+        # search genomes x metagenomes (branchwater k31, sc1000)
+        mgx_k31 = f"{outdir}/search-genomes-x-brmetagenomes.manysearch.csv",
+        # bins x search genomes
+        bins_x_searchgx = f"{outdir}/bins-x-search-genomes.multisearch.csv",
+        # bins x NCBI euks scaled 1,000
+        bins_x_ncbi = f"{outdir}/bins-x-ncbi-euks.multisearch.sc1000.csv",
+        # sendsketch results (already aggregated with brachwater-web results and metadata)
+        sendsketch=sendsketch_results,
+        # bins x NCBI entire scaled 10,000
+        # bins_x_ncbi = f"{outdir}/bins-x-ncbi-entire.manysearch.csv",
     output:
-        manysearch=f"{outdir}/bins-x-ncbi-euks.manysearch.sc1000.csv"
-    log: f"{outdir}/logs/bins-x-ncbi-entire.manysearch.sc1000.log"
-    benchmark: f"{outdir}/logs/bins-x-ncbi-euk.manysearch.sc1000.benchmark"
+        summary_csv=f"{outdir}/aggregate-results.summary.csv"
+    params:
+        out_csv=f"{outdir}/aggregate-results.summary.csv"
+    log: f"{outdir}/logs/aggregate-results.log"
+    benchmark: f"{outdir}/logs/aggregate-results.benchmark"
     shell:
         """
-        sourmash scripts manysearch --scaled 1_000 -k 51 {input.zip} {input.db_txt} -o {output.manysearch} > {log} 2>&1
+        python3 scripts/aggregate-results.py --expected-csv {input.expected_taxonomy} \
+                                             --bins {input.bins_file} \
+                                             --mgx-manysearch-csv {input.mgx_k31} \
+                                             --bin-manysearch-ncbi-csv {input.bins_x_ncbi} \
+                                             --multisearch-bins {input.bins_x_searchgx} \
+                                             --sendsketch-csv {input.sendsketch} \
+                                             --output {params.out_csv} > {log} 2>&1
         """
-        #sourmash scripts manysearch --scaled 1_000 -k 51 {input.zip} {input.fungi} {input.euk_other} {input.bilateria_minus_verts} -o {output.manysearch} > {log} 2>&1
-
-# now aggregate and assess the results
