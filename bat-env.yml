@@ -1,0 +1,9 @@
+name: bat-env
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - diamond=2.1.12
+  - prodigal=2.6.3
+  - cat=6.0.1
