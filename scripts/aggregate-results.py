@@ -600,16 +600,15 @@ def main(args):
         if res.expected_genus == "Acanthamoeba":
             res.expected_genus = "Mimivirus"
 
-
-    # --- Write CSV ---
-    print(f"Writing results to '{args.output}'...")
-    write_results_csv(results, args.output)
-
     # --- Summarize by tool ---
     summarize_results(results, expected_map)
-
+    
     # --- Summarize by Accession ---
     write_accession_summary(results, out_csv="multi-accession-summary.csv")
+    
+    # --- Write Full Aggregated CSV ---
+    print(f"Writing full results to '{args.output}'...")
+    write_results_csv(results, args.output)
 
 
 if __name__ == "__main__":
