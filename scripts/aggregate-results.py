@@ -635,9 +635,8 @@ def main(args):
 
             # now actual sendsketch aggregated results
             res.bins_x_sendsketch_match_level = sendsketch_row.get("match level", "unmatched")
-
         # sourmash bins x exact search genomes
-        res.bins_x_searchgx_match_level, res.bins_x_searchgx_nbins_matched, res.bins_x_searchgx_topANI = \
+            res.bins_x_searchgx_match_level, res.bins_x_searchgx_nbins_matched, res.bins_x_searchgx_topANI = \
             check_exact_bins_for_accession(acc, res.expected_genus, res.expected_species, bins_df)
 
         # sourmash search bins x NCBI
@@ -677,10 +676,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aggregate bin search and annotation results.")
     parser.add_argument("--expected-csv", help="CSV file with expected metagenome accessions and species", default="multi/multi_mapping.csv")
     parser.add_argument("--mgx-manysearch-csv", help="CSV file with manysearch results.", default="output.manysearch/search-genomes-x-brmetagenomes.manysearch.csv")
-    parser.add_argument("--bin-manysearch-ncbi-csv", help="CSV file with bin search results.", default="output.manysearch/bins-x-ncbi-entire.manysearch.csv")
+    parser.add_argument("--bin-manysearch-ncbi-csv", help="CSV file with bin search results.", default="output.manysearch/bins-x-ncbi-euks.multisearch.sc1000.csv")
     parser.add_argument("-o", "--output", help="Output CSV with added expected species/genus columns.", default="multi-aggregated-results.csv")
     parser.add_argument("--bins", help="path to all bins", default="multi_bins.txt")
-    parser.add_argument("--multisearch-bins", help = "CSV file with multisearch bins", default="output.manysearch/bins-x-search-genomes.multisearch.default-thresh.csv")
+    parser.add_argument("--multisearch-bins", help = "CSV file with multisearch bins", default="output.manysearch/bins-x-search-genomes.multisearch.csv")
     parser.add_argument("--sendsketch-csv", help="CSV file with SendSketch results.", default="multi/multi.sendsketch.csv")
 
     args = parser.parse_args()
