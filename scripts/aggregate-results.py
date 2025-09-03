@@ -658,7 +658,7 @@ def main(args):
 
         results.append(res)
 
-        # fix virus genus name
+        # fix virus genus name in output CSVs
         if res.expected_genus == "Acanthamoeba":
             res.expected_genus = "Mimivirus"
 
@@ -666,7 +666,7 @@ def main(args):
     summarize_results(results, expected_map)
     
     # --- Summarize by Accession ---
-    write_accession_summary(results, out_csv="multi-accession-summary.csv")
+    write_accession_summary(results, out_csv=args.bin_summary)
     
     # --- Write Full Aggregated CSV ---
     print(f"Writing full results to '{args.output}'...")
@@ -678,7 +678,8 @@ if __name__ == "__main__":
     parser.add_argument("--expected-csv", help="CSV file with expected metagenome accessions and species", default="multi/multi_mapping.csv")
     parser.add_argument("--mgx-manysearch-csv", help="CSV file with manysearch results.", default="output.sourmash/search-genomes-x-brmetagenomes.manysearch.csv")
     parser.add_argument("--bin-manysearch-ncbi-csv", help="CSV file with bin search results.", default="output.sourmash/bins-x-ncbi-euks.multisearch.sc1000.csv")
-    parser.add_argument("-o", "--output", help="Output CSV with added expected species/genus columns.", default="multi-aggregated-results.csv")
+    parser.add_argument("-o", "--output", help="Output CSV with mgx, bin summarization.", default="multi.aggregated-results.csv")
+    parser.add_argument("--bin-summary", help="Output CSV with only bin summary results.", default="multi.aggregated-results-bins.csv")
     parser.add_argument("--bins", help="path to all bins", default="multi_bins.txt")
     parser.add_argument("--multisearch-bins", help = "CSV file with multisearch bins", default="output.sourmash/bins-x-search-genomes.multisearch.csv")
     parser.add_argument("--sendsketch-csv", help="CSV file with SendSketch results.", default="multi/multi.sendsketch.csv")

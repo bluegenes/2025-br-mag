@@ -26,7 +26,7 @@ rule all:
         # bins x NCBI euks scaled 1,000
         f"{outdir}/bins-x-ncbi-euks.multisearch.sc1000.csv",
         # aggregated results
-        f"{outdir}/multi.aggregated-summary.csv"
+        f"{outdir}/multi.aggregated-results.csv"
 
 
 #### 1. Sketch the search genomes ####
@@ -181,7 +181,8 @@ rule aggregate_results:
         # bins x NCBI entire scaled 10,000
         # bins_x_ncbi = f"{outdir}/bins-x-ncbi-entire.manysearch.csv",
     output:
-        summary_csv=f"{outdir}/multi.aggregated-summary.csv"
+        summary_csv=f"{outdir}/multi.aggregated-results.csv",
+        bin_summary_csv=f"{outdir}/multi.aggregated-results-bins.csv",
     log: f"{outdir}/logs/aggregate-results.log"
     benchmark: f"{outdir}/logs/aggregate-results.benchmark"
     shell:
@@ -192,5 +193,6 @@ rule aggregate_results:
                                              --bin-manysearch-ncbi-csv {input.bins_x_ncbi} \
                                              --multisearch-bins {input.bins_x_searchgx} \
                                              --sendsketch-csv {input.sendsketch} \
+                                             --bin-summary {output.bin_summary_csv} \
                                              --output {output.summary_csv} > {log} 2>&1
         """
