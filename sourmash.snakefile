@@ -1,5 +1,5 @@
 
-outdir = "output.manysearch"
+outdir = "output.sourmash"
 metagenome_mf = "br-magtest.wort.mf.csv",
 
 search_genomes = {"GCF_000888735.1": "Acanthamoeba polyphaga mimivirus",

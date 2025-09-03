@@ -401,16 +401,17 @@ def check_exact_bins_for_accession(acc: str,
     if not rows:
         return "unmatched", 0, None
 
-    # species matches
-    s_rows = [r for r in rows if any(a.lower() in str(r["match_name"]).lower() for a in s_aliases)]
-    g_rows = [r for r in rows if any(a.lower() in str(r["match_name"]).lower() for a in g_aliases)]
+    # identify matches to the search genome
+    match_rows = [r for r in rows if any(a.lower() in str(r["match_name"]).lower() for a in s_aliases)]
 
-    if s_rows:
-        best = max(r.get("average_containment_ani", 0) for r in s_rows)
-        return "species", len(s_rows), best
-    elif g_rows:
-        best = max(r.get("average_containment_ani", 0) for r in g_rows)
-        return "genus", len(g_rows), best
+    # estimate species-level match: containment ANI in either direction is ANI >= 0.95; else genus
+    if match_rows:
+        valid_ani = [float(r.get("max_containment_ani", 0)) for r in match_rows if r.get("max_containment_ani") not in (None, "", "NA")]
+        best = max(valid_ani) if valid_ani else 0
+        if best >= 0.95:
+            return "species", len(match_rows), best
+        else:
+            return "genus", len(match_rows), best
     else:
         return "unmatched", 0, None
 
@@ -675,11 +676,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aggregate bin search and annotation results.")
     parser.add_argument("--expected-csv", help="CSV file with expected metagenome accessions and species", default="multi/multi_mapping.csv")
-    parser.add_argument("--mgx-manysearch-csv", help="CSV file with manysearch results.", default="output.manysearch/search-genomes-x-brmetagenomes.manysearch.csv")
-    parser.add_argument("--bin-manysearch-ncbi-csv", help="CSV file with bin search results.", default="output.manysearch/bins-x-ncbi-euks.multisearch.sc1000.csv")
+    parser.add_argument("--mgx-manysearch-csv", help="CSV file with manysearch results.", default="output.sourmash/search-genomes-x-brmetagenomes.manysearch.csv")
+    parser.add_argument("--bin-manysearch-ncbi-csv", help="CSV file with bin search results.", default="output.sourmash/bins-x-ncbi-euks.multisearch.sc1000.csv")
     parser.add_argument("-o", "--output", help="Output CSV with added expected species/genus columns.", default="multi-aggregated-results.csv")
     parser.add_argument("--bins", help="path to all bins", default="multi_bins.txt")
-    parser.add_argument("--multisearch-bins", help = "CSV file with multisearch bins", default="output.manysearch/bins-x-search-genomes.multisearch.csv")
+    parser.add_argument("--multisearch-bins", help = "CSV file with multisearch bins", default="output.sourmash/bins-x-search-genomes.multisearch.csv")
     parser.add_argument("--sendsketch-csv", help="CSV file with SendSketch results.", default="multi/multi.sendsketch.csv")
 
     args = parser.parse_args()
