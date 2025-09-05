@@ -23,7 +23,7 @@ class AccessionResult:
     accession: str
     expected_genus: str
     expected_species: str
-    
+
     # NCBI metadata
     assay_type: Optional[str] = None
     bioproject: Optional[str] = None
@@ -43,7 +43,7 @@ class AccessionResult:
     mgx_k31_containment: Optional[float] = None
     mgx_k31_containment_target_in_query: Optional[float] = None
     mgx_k31_f_weighted_target_in_query: Optional[float] = None
-    
+
     # bin results
     nbins: int = 0
     bins_x_searchgx_match_level: str = "unmatched"
@@ -62,7 +62,7 @@ class AccessionResult:
 
     # sendsketch results
     bins_x_sendsketch_match_level: str = "unmatched"
-    
+
 
     def to_dict(self):
         return asdict(self)
@@ -170,7 +170,7 @@ def summarize_results(results: list[AccessionResult], expected_map: dict):
         print("\nNo BAT ORF species/genus match:")
         for r in missing_bat_orfs:
             print(f"  {r.accession} — expected {r.expected_species}")
-    
+
     # === SENDSKETCH ===
     valid_ss = [r for r in results if r.bins_x_sendsketch_match_level != "NA"]
 
@@ -255,9 +255,9 @@ def accession_summary_table(results: list[AccessionResult]) -> tuple[list[dict],
             else:
                 unmatched.append(row)
                 continue
-        
+
         table.append(row)
-        
+
     return table, nobins, unmatched, orf_match_only
 
 def write_accession_summary(results: list[AccessionResult],
@@ -294,7 +294,7 @@ def write_accession_summary(results: list[AccessionResult],
         print("\t".join(header))
         for row in unmatched:
             print("\t".join(str(row[h]) for h in header))
-    
+
     # --- Write CSV if requested ---
     if out_csv:
         with open(out_csv, "w", newline="") as f:
@@ -584,7 +584,7 @@ def main(args):
     # --- Load bin search results ---
     with open(args.multisearch_bins, newline="") as f:
         bins_df = list(csv.DictReader(f))
-    
+
     # derive metagenome accession (SRRxxxx from SRRxxxx.y)
     for r in bins_df:
         if "query_name" in r and r["query_name"]:
@@ -592,7 +592,7 @@ def main(args):
 
     with open(args.bin_manysearch_ncbi_csv, newline="") as f:
         ncbi_bins = list(csv.DictReader(f))
-    
+
     # derive metagenome accession (SRRxxxx from SRRxxxx.y)
     for r in ncbi_bins:
         if "query_name" in r and r["query_name"]:
@@ -615,9 +615,9 @@ def main(args):
             res.mgx_k31_containment = float(mgx_row.get("containment") or 0)
             res.mgx_k31_containment_target_in_query = float(mgx_row.get("containment_target_in_query") or 0)
             res.mgx_k31_f_weighted_target_in_query = float(mgx_row.get("f_weighted_target_in_query") or 0)
-        
+
         # Bin Results
-        
+
         # Sendsketch + metadata
         sendsketch_row = sendsketch_results.get(acc)
         if sendsketch_row:
@@ -648,7 +648,7 @@ def main(args):
         # BAT bin annotation
         res.bins_x_batNR_match_level, res.bins_x_batNR_support, res.orfs_x_batNR_match_level = \
             check_bat_for_accession(acc, res.expected_genus, res.expected_species, "output.BAT")
-        
+
         # --- enforce NA if no bins ---
         if res.nbins == 0:
             res.bins_x_searchgx_match_level = "NA"
@@ -664,10 +664,10 @@ def main(args):
 
     # --- Summarize by tool ---
     summarize_results(results, expected_map)
-    
+
     # --- Summarize by Accession ---
     write_accession_summary(results, out_csv=args.bin_summary)
-    
+
     # --- Write Full Aggregated CSV ---
     print(f"Writing full results to '{args.output}'...")
     write_results_csv(results, args.output)
@@ -682,7 +682,7 @@ if __name__ == "__main__":
     parser.add_argument("--bin-summary", help="Output CSV with only bin summary results.", default="multi.aggregated-results-bins.csv")
     parser.add_argument("--bins", help="path to all bins", default="multi_bins.txt")
     parser.add_argument("--multisearch-bins", help = "CSV file with multisearch bins", default="output.sourmash/bins-x-search-genomes.multisearch.csv")
-    parser.add_argument("--sendsketch-csv", help="CSV file with SendSketch results.", default="multi/multi.sendsketch.csv")
+    parser.add_argument("--sendsketch-csv", help="CSV file with SendSketch results.", default="multi/multispecies_tracking.csv")
 
     args = parser.parse_args()
 

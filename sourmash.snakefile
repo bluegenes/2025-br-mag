@@ -10,7 +10,7 @@ search_genomes = {"GCF_000888735.1": "Acanthamoeba polyphaga mimivirus",
 
 bins_file = "multi_bins.txt"
 expected_taxonomy = "multi/multi_mapping.csv"
-sendsketch_results = "multi/multi.sendsketch.csv"
+sendsketch_results = "multi/multispecies_tracking.csv"
 
 rule all:
     input:
@@ -196,3 +196,4 @@ rule aggregate_results:
                                              --bin-summary {output.bin_summary_csv} \
                                              --output {output.summary_csv} > {log} 2>&1
         """
+
